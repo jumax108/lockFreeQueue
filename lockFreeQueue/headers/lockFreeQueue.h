@@ -39,21 +39,6 @@ private:
 
 	CObjectFreeListTLS<stNode> _nodeFreeList;
 
-	struct stLogLine{
-
-		int _logCnt = 0;
-		int _code = 0;
-
-		long _threadID = 0;
-		void* _org = nullptr;
-		void* _next = nullptr;
-		void* _data = nullptr;
-
-	};
-
-	stLogLine _logLine[65536];
-	int _logCnt;
-
 };
 
 template <typename T>
@@ -66,9 +51,6 @@ CLockFreeQueue<T>::CLockFreeQueue():
 
 	_nodeChangeCnt = 0;
 	_size = 0;
-
-	ZeroMemory(_logLine, sizeof(_logLine));
-	_logCnt = 0;
 }
 
 template <typename T>
@@ -86,20 +68,6 @@ void CLockFreeQueue<T>::push(T data){
 		
 	InterlockedAdd64((LONG64*)&_nodeChangeCnt, 0x0000080000000000);
 	newPtr = (void*)(_nodeChangeCnt | (unsigned __int64)newNode);
-
-	{
-		int logCnt = InterlockedIncrement((LONG*)&_logCnt) - 1;
-		stLogLine* logLine = &_logLine[(unsigned short)logCnt];
-
-		logLine->_logCnt = logCnt;
-		logLine->_code = 0x10;
-
-		logLine->_threadID = __threadid();
-		logLine->_org = _tail;
-		logLine->_next = nullptr;
-		logLine->_data = (void*)data;
-
-	}
 
 	do{
 		
@@ -123,21 +91,10 @@ void CLockFreeQueue<T>::push(T data){
 
 	} while( InterlockedCompareExchange64((LONG64*)&tailNode->_next, (LONG64)newPtr, (LONG64)nullptr ) != (LONG64)nullptr );
 	
+	// tail로 저장했던 노드가 다른 스레드에 의해 해제, 재할당, 기존 tail의 next로 붙고 tail을 먼저 변경해버리면
+	// 아래 interlock 실패하게됨 (_tail이 변경되었기에)
 	InterlockedCompareExchange64((LONG64*)&_tail, (LONG64)newPtr, (LONG64)tail);
 	
-	{
-		int logCnt = InterlockedIncrement((LONG*)&_logCnt) - 1;
-		stLogLine* logLine = &_logLine[(unsigned short)logCnt];
-
-		logLine->_logCnt = logCnt;
-		logLine->_code = 0x11;
-		
-		logLine->_threadID = __threadid();
-		logLine->_org = tail;
-		logLine->_next = tailNode->_next;
-		logLine->_data = (void*)data;
-	}
-
 	InterlockedIncrement64((LONG64*)&_size);
 
 }
@@ -159,19 +116,6 @@ bool CLockFreeQueue<T>::pop(T* data){
 	stNode* headNode;
 
 	T popData = NULL;
-	
-	{
-		int logCnt = InterlockedIncrement((LONG*)&_logCnt) - 1;
-		stLogLine* logLine = &_logLine[(unsigned short)logCnt];
-
-		logLine->_logCnt = logCnt;
-		logLine->_code = 0x20;
-		
-		logLine->_threadID = __threadid();
-		logLine->_org = _head;
-		logLine->_next = nullptr;
-		logLine->_data = nullptr;
-	}
 
 	do{
 		
@@ -192,19 +136,6 @@ bool CLockFreeQueue<T>::pop(T* data){
 	
 	*data = popData;
 
-	{
-		int logCnt = InterlockedIncrement((LONG*)&_logCnt) - 1;
-		stLogLine* logLine = &_logLine[(unsigned short)logCnt];
-
-		logLine->_logCnt = logCnt;
-		logLine->_code = 0x21;
-		
-		logLine->_threadID = __threadid();
-		logLine->_org = head;
-		logLine->_next = popPtr;
-		logLine->_data = popData;
-	}
-	
 	_nodeFreeList.freeObject(headNode);
 
 	return true;

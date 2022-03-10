@@ -3,8 +3,8 @@
 
 #include "../headers/lockFreeQueue.h"
 
-constexpr int THREAD_NUM = 3;
-constexpr int NODE_NUM_EACH_THREAD = 100;
+constexpr int THREAD_NUM = 2;
+constexpr int NODE_NUM_EACH_THREAD = 1;
 
 constexpr int TOTAL_NODE_NUM = THREAD_NUM * NODE_NUM_EACH_THREAD;
 
