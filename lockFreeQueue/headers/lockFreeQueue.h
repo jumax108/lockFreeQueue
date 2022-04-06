@@ -24,7 +24,6 @@ private:
 	struct stNode{
 		stNode(){
 			_next = nullptr;
-			_data = NULL;
 		}
 		void* _next;
 		T _data;
@@ -117,7 +116,7 @@ bool CLockFreeQueue<T>::pop(T* data){
 
 	T popData = NULL;
 
-	do{
+	for(;;){
 		
 		head = _head;
 		headNode = (stNode*)((unsigned __int64)head & _pointerMask);
@@ -132,7 +131,10 @@ bool CLockFreeQueue<T>::pop(T* data){
 		popNode = (stNode*)((unsigned __int64)popPtr & _pointerMask);
 		popData = popNode->_data;
 
-	}while(  InterlockedCompareExchange64((LONG64*)&_head, (LONG64)popPtr, (LONG64)head) != (LONG64)head);
+		if(InterlockedCompareExchange64((LONG64*)&_head, (LONG64)popPtr, (LONG64)head) == (LONG64)head){
+			break;
+		}
+	}
 	
 	*data = popData;
 
