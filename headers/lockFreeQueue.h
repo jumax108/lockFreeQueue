@@ -114,8 +114,6 @@ bool CLockFreeQueue<T>::pop(T* data){
 	stNode* popNode;
 	stNode* headNode;
 
-	T popData = NULL;
-
 	for(;;){
 		
 		head = _head;
@@ -129,15 +127,13 @@ bool CLockFreeQueue<T>::pop(T* data){
 		}
 		
 		popNode = (stNode*)((unsigned __int64)popPtr & _pointerMask);
-		popData = popNode->_data;
+		*data = popNode->_data;
 
 		if(InterlockedCompareExchange64((LONG64*)&_head, (LONG64)popPtr, (LONG64)head) == (LONG64)head){
 			break;
 		}
 	}
 	
-	*data = popData;
-
 	_nodeFreeList.freeObject(headNode);
 
 	return true;
