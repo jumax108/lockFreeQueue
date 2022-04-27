@@ -36,7 +36,7 @@ private:
 
 	unsigned __int64 _nodeChangeCnt;
 
-	CObjectFreeListTLS<stNode> _nodeFreeList;
+	CObjectFreeList<stNode> _nodeFreeList;
 
 };
 
