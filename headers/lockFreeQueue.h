@@ -19,8 +19,6 @@ public:
 
 	unsigned __int64 getSize();
 
-private:
-
 	struct stNode{
 		stNode(){
 			_next = nullptr;
@@ -28,6 +26,8 @@ private:
 		void* _next;
 		T _data;
 	};
+
+private:
 	
 	void* _head;
 	void* _tail;
@@ -47,6 +47,7 @@ CLockFreeQueue<T>::CLockFreeQueue():
 	stNode* node = _nodeFreeList.allocObject();
 	_head = node;
 	_tail = node;
+	node->_next = nullptr;
 
 	_nodeChangeCnt = 0;
 	_size = 0;
@@ -65,7 +66,7 @@ void CLockFreeQueue<T>::push(T data){
 
 	stNode* tailNode;
 		
-	InterlockedAdd64((LONG64*)&_nodeChangeCnt, 0x0000080000000000);
+	_nodeChangeCnt += 0x0000080000000000;
 	newPtr = (void*)(_nodeChangeCnt | (unsigned __int64)newNode);
 
 	do{
@@ -115,17 +116,30 @@ bool CLockFreeQueue<T>::pop(T* data){
 	stNode* headNode;
 
 	T* popNodeData;
+
+	void* tail;
+	void* tailNextPtr;
+
+	stNode* tailNode;
+
 	for(;;){
 		
 		head = _head;
 		headNode = (stNode*)((unsigned __int64)head & _pointerMask);
 			
 		popPtr = headNode->_next;
-		if(popPtr == nullptr){
-			// haedNode 획득 이후 다른 스레드에서 head를 free 후 재할당 받아서 next를 nullptr로 초기화할 수 있음
-			head = nullptr;
-			continue;
-		}
+		do {
+
+			tail = _tail;
+			tailNode = (stNode*)((unsigned __int64)tail & _pointerMask);
+			tailNextPtr = tailNode->_next;
+
+			if (tailNextPtr == nullptr) {
+				break;
+			}
+
+		} while (InterlockedCompareExchange64((LONG64*)&_tail, (LONG64)tailNextPtr, (LONG64)tail) != (LONG64)tail);
+
 		
 		popNode = (stNode*)((unsigned __int64)popPtr & _pointerMask);
 		popNodeData = popNode->_data;
